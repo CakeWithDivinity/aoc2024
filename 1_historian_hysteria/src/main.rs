@@ -1,7 +1,7 @@
 use std::{
+    collections::HashMap,
     fs::File,
     io::{BufRead, BufReader, Error},
-    iter::zip,
     vec,
 };
 
@@ -30,11 +30,15 @@ fn main() -> Result<(), Error> {
         );
     }
 
-    left_nums.sort();
-    right_nums.sort();
+    let right_num_occurence: HashMap<usize, usize> =
+        right_nums.iter().fold(HashMap::new(), |mut acc, curr| {
+            acc.insert(*curr, acc.get(curr).unwrap_or(&0) + 1);
+            acc
+        });
 
-    let sum: usize = zip(left_nums, right_nums)
-        .map(|(left, right)| left.abs_diff(right))
+    let sum: usize = left_nums
+        .iter()
+        .map(|num| num * right_num_occurence.get(num).unwrap_or(&0))
         .sum();
 
     println!("Sum is {sum}");
