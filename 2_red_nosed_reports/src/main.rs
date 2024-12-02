@@ -42,7 +42,14 @@ fn main() -> Result<(), Error> {
 
     let valid_record_count = records
         .iter()
-        .filter(|record| is_valid_record(record))
+        .filter(|record| {
+            is_valid_record(record)
+                || (0..record.len()).any(|remove_idx| {
+                    let mut new_record = (*record).clone();
+                    new_record.remove(remove_idx);
+                    is_valid_record(&new_record)
+                })
+        })
         .count();
 
     println!("Valid record count: {valid_record_count}");
