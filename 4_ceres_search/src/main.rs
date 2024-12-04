@@ -27,20 +27,31 @@ impl Direction {
             Direction::DownRight => (1, 1),
         }
     }
+
+    fn get_opposite(&self) -> Direction {
+        match self {
+            Direction::Left => Direction::Right,
+            Direction::Right => Direction::Left,
+            Direction::Up => Direction::Down,
+            Direction::Down => Direction::Up,
+            Direction::UpLeft => Direction::DownRight,
+            Direction::UpRight => Direction::DownLeft,
+            Direction::DownLeft => Direction::UpRight,
+            Direction::DownRight => Direction::UpLeft,
+        }
+    }
 }
 
 static ALL_DIRS: &[Direction] = &[
-    Direction::Right,
-    Direction::Left,
-    Direction::Up,
-    Direction::Down,
+    // Direction::Right,
+    // Direction::Left,
+    // Direction::Up,
+    // Direction::Down,
     Direction::UpLeft,
     Direction::UpRight,
     Direction::DownLeft,
     Direction::DownRight,
 ];
-
-static LETTERS: &[char] = &['X', 'M', 'A', 'S'];
 
 fn apply_direction_to_position(
     direction: &Direction,
@@ -54,36 +65,39 @@ fn apply_direction_to_position(
     Some((new_y, new_x))
 }
 
-fn valid_xmas_count_at_pos(vec: &[Vec<char>], line_idx: usize, char_idx: usize) -> usize {
-    if vec[line_idx][char_idx] != LETTERS[0] {
-        return 0;
+fn get_char_in_dir(
+    vec: &[Vec<char>],
+    direction: &Direction,
+    position: (usize, usize),
+) -> Option<char> {
+    let pos = apply_direction_to_position(direction, position)?;
+
+    let char = vec.get(pos.0).map(|line| line.get(pos.1))??;
+
+    Some(*char)
+}
+
+fn is_valid_xmas_at_pos(vec: &[Vec<char>], line_idx: usize, char_idx: usize) -> bool {
+    let pos = (line_idx, char_idx);
+    if vec[line_idx][char_idx] != 'A' {
+        return false;
     }
 
-    let mut valid_count = 0;
+    let mut mas_count = 0;
 
-    'dir_loop: for dir in ALL_DIRS {
-        let mut curr_pos = (line_idx, char_idx);
-
-        for letter in &LETTERS[1..] {
-            let Some(next_pos) = apply_direction_to_position(dir, curr_pos) else {
-                continue 'dir_loop;
-            };
-
-            curr_pos = next_pos;
-
-            let Some(Some(c)) = vec.get(curr_pos.0).map(|line| line.get(curr_pos.1)) else {
-                continue 'dir_loop;
-            };
-
-            if c != letter {
-                continue 'dir_loop;
-            }
+    for dir in ALL_DIRS {
+        if get_char_in_dir(vec, dir, pos).map_or(true, |c| c != 'M') {
+            continue;
         }
 
-        valid_count += 1;
+        if get_char_in_dir(vec, &dir.get_opposite(), pos).map_or(true, |c| c != 'S') {
+            continue;
+        }
+
+        mas_count += 1;
     }
 
-    valid_count
+    mas_count == 2
 }
 
 fn main() -> Result<(), Error> {
@@ -98,7 +112,9 @@ fn main() -> Result<(), Error> {
     let mut sum = 0;
     for (line_idx, line) in chars.iter().enumerate() {
         for (char_idx, _) in line.iter().enumerate() {
-            sum += valid_xmas_count_at_pos(&chars, line_idx, char_idx);
+            if is_valid_xmas_at_pos(&chars, line_idx, char_idx) {
+                sum += 1;
+            }
         }
     }
 
