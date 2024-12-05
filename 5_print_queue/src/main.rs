@@ -1,4 +1,5 @@
 use std::{
+    cmp::Ordering,
     collections::{HashMap, HashSet},
     fs::File,
     io::{BufRead, BufReader, Error},
@@ -38,6 +39,22 @@ fn is_valid_update(update: &[usize], rules: &Rules) -> bool {
     true
 }
 
+fn fix_invalid_update(update: &[usize], rules: &Rules) -> Vec<usize> {
+    let mut update = update.to_vec();
+
+    update.sort_by(|a, b| {
+        let nums_after_a = rules.get(a);
+
+        if nums_after_a.is_some_and(|after| after.contains(b)) {
+            return Ordering::Less;
+        };
+
+        Ordering::Greater
+    });
+
+    update
+}
+
 fn main() -> Result<(), Error> {
     let file = File::open("input.txt")?;
     let reader = BufReader::new(file);
@@ -67,7 +84,8 @@ fn main() -> Result<(), Error> {
 
     let sum: usize = updates
         .iter()
-        .filter(|update| is_valid_update(update, &rules_map))
+        .filter(|update| !is_valid_update(update, &rules_map))
+        .map(|update| fix_invalid_update(update, &rules_map))
         .map(|update| update[update.len() / 2])
         .sum();
 
