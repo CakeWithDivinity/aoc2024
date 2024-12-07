@@ -5,6 +5,7 @@ use std::{
     io::{BufRead, BufReader, Error},
 };
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 enum Direction {
     Up,
     Down,
@@ -41,9 +42,12 @@ fn walk_direction(current_pos: (usize, usize), direction: &Direction) -> Option<
     Some((new_y, new_x))
 }
 
-fn count_path_tiles(starting_pos: (usize, usize), map: &[Vec<char>]) -> usize {
-    let mut visited_tiles: HashSet<(usize, usize)> = HashSet::new();
-    visited_tiles.insert(starting_pos);
+fn get_path(
+    starting_pos: (usize, usize),
+    map: &[Vec<char>],
+) -> Option<HashSet<(usize, usize, Direction)>> {
+    let mut visited_tiles: HashSet<(usize, usize, Direction)> = HashSet::new();
+    visited_tiles.insert((starting_pos.0, starting_pos.1, Direction::Up));
 
     let mut current_pos = starting_pos;
     let mut current_direction = Direction::Up;
@@ -52,10 +56,17 @@ fn count_path_tiles(starting_pos: (usize, usize), map: &[Vec<char>]) -> usize {
         let next_tile = map.get(new_pos.0).and_then(|line| line.get(new_pos.1));
         match next_tile {
             None => break,
-            Some('#') => current_direction = current_direction.turn_right(),
+            Some('#') => {
+                current_direction = current_direction.turn_right();
+            }
             Some('.' | '^') => {
                 current_pos = new_pos;
-                visited_tiles.insert(new_pos);
+
+                if visited_tiles.contains(&(new_pos.0, new_pos.1, current_direction.clone())) {
+                    return None;
+                }
+
+                visited_tiles.insert((new_pos.0, new_pos.1, current_direction.clone()));
             }
             Some(tile) => {
                 panic!("Unexpected next tile {tile}")
@@ -63,7 +74,39 @@ fn count_path_tiles(starting_pos: (usize, usize), map: &[Vec<char>]) -> usize {
         }
     }
 
-    visited_tiles.len()
+    Some(visited_tiles)
+}
+
+fn get_obstacle_count(starting_pos: (usize, usize), map: &[Vec<char>]) -> usize {
+    let visited_tiles = get_path(starting_pos, map).expect("normal path cannot have loop");
+
+    let mut obstacle_map: HashSet<(usize, usize)> = HashSet::new();
+
+    visited_tiles
+        .iter()
+        .filter_map(|(y, x, _)| {
+            let mut new_map = map.to_owned();
+
+            if *y >= new_map.len() || *x >= new_map[*y].len() {
+                return None;
+            }
+
+            if new_map[*y][*x] == '#' {
+                return None;
+            }
+
+            new_map[*y][*x] = '#';
+
+            match get_path(starting_pos, &new_map) {
+                None => Some((*y, *x)),
+                Some(_) => None,
+            }
+        })
+        .for_each(|obstacle_pos| {
+            obstacle_map.insert(obstacle_pos);
+        });
+
+    obstacle_map.len()
 }
 
 fn main() -> Result<(), Error> {
@@ -87,9 +130,9 @@ fn main() -> Result<(), Error> {
         })
         .expect("starting position");
 
-    let path_tile_count = count_path_tiles(starting_pos, &map);
+    let obstacle_count = get_obstacle_count(starting_pos, &map);
 
-    println!("Path tile count is {path_tile_count}");
+    println!("Obstacle count is {obstacle_count}");
 
     Ok(())
 }
