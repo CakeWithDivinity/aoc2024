@@ -3,6 +3,13 @@ use std::{
     io::{BufRead, BufReader, Error},
 };
 
+fn concatenate_numbers(left: usize, right: usize) -> usize {
+    let left_str = left.to_string();
+    let right_str = right.to_string();
+    let concatenated = left_str + &right_str;
+    concatenated.parse().unwrap()
+}
+
 fn is_valid_equation(target: usize, current: usize, numbers: &[usize]) -> bool {
     if current > target {
         return false;
@@ -14,6 +21,11 @@ fn is_valid_equation(target: usize, current: usize, numbers: &[usize]) -> bool {
 
     is_valid_equation(target, current + next_num, numbers_left)
         || is_valid_equation(target, current * next_num, numbers_left)
+        || is_valid_equation(
+            target,
+            concatenate_numbers(current, *next_num),
+            numbers_left,
+        )
 }
 
 fn sum_valid_equations(equations: &[(usize, Vec<usize>)]) -> usize {
