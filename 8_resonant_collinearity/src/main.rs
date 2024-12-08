@@ -24,18 +24,46 @@ fn get_antenna_map(map: &[Vec<char>]) -> AntennaMap {
     antenna_map
 }
 
-fn get_antinode_positions(a: &Position, b: &Position) -> (Position, Position) {
+fn is_valid_antinode_pos(pos: &Position, width: isize, height: isize) -> bool {
+    pos.0 >= 0 && pos.0 < width && pos.1 >= 0 && pos.1 < height
+}
+
+fn get_antinode_positions(
+    a: &Position,
+    b: &Position,
+    width: isize,
+    height: isize,
+) -> Vec<Position> {
+    let mut positions: Vec<Position> = Vec::new();
+
     let y_diff = a.0 - b.0;
     let x_diff = a.1 - b.1;
 
-    let pos1 = (a.0 - 2 * y_diff, a.1 - 2 * x_diff);
-    let pos2 = (b.0 + 2 * y_diff, b.1 + 2 * x_diff);
+    let mut index = 1;
+    loop {
+        let pos = (a.0 - index * y_diff, a.1 - index * x_diff);
 
-    (pos1, pos2)
-}
+        if !is_valid_antinode_pos(&pos, width, height) {
+            break;
+        }
 
-fn is_valid_antinode_pos(pos: &Position, width: isize, height: isize) -> bool {
-    pos.0 >= 0 && pos.0 < width && pos.1 >= 0 && pos.1 < height
+        positions.push(pos);
+        index += 1;
+    }
+
+    let mut index = 1;
+    loop {
+        let pos = (b.0 + index * y_diff, b.1 + index * x_diff);
+
+        if !is_valid_antinode_pos(&pos, width, height) {
+            break;
+        }
+
+        positions.push(pos);
+        index += 1;
+    }
+
+    positions
 }
 
 fn get_antinode_count(map: &[Vec<char>]) -> usize {
@@ -53,14 +81,10 @@ fn get_antinode_count(map: &[Vec<char>]) -> usize {
         .collect();
 
     for (a, b) in antenna_combinations {
-        let antinode_positions = get_antinode_positions(a, b);
+        let antinode_positions = get_antinode_positions(a, b, width, height);
 
-        if is_valid_antinode_pos(&antinode_positions.0, width, height) {
-            antinodes.insert(antinode_positions.0);
-        }
-
-        if is_valid_antinode_pos(&antinode_positions.1, width, height) {
-            antinodes.insert(antinode_positions.1);
+        for antinode in antinode_positions {
+            antinodes.insert(antinode);
         }
     }
 
