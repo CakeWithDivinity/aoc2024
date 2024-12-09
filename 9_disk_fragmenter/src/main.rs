@@ -1,51 +1,72 @@
+use core::panic;
 use std::{
     fs::File,
     io::{BufRead, BufReader, Error},
 };
 
-fn get_optimal_disk_layout(mut input: Vec<u32>) -> Vec<usize> {
+enum Block {
+    File(u32, usize),
+    Free(u32),
+}
+
+fn get_last_fitting_file_idx(free_size: u32, input: &[Block]) -> Option<usize> {
+    let mut last_potential_file_idx = input.len() - 1;
+
+    loop {
+        let Block::File(file_size, _) = input[last_potential_file_idx] else {
+            last_potential_file_idx -= 1;
+            continue;
+        };
+
+        if file_size > 0 && free_size >= file_size {
+            return Some(last_potential_file_idx);
+        }
+
+        if last_potential_file_idx < 1 {
+            return None;
+        }
+
+        last_potential_file_idx -= 1;
+    }
+}
+
+fn get_optimal_disk_layout(mut input: Vec<Block>) -> Vec<usize> {
     let mut optimal_ids = Vec::new();
-
-    let input_is_even = input.len() % 2 == 0;
-    let mut file_id = 0;
-
-    let mut last_file_idx = if input_is_even {
-        input.len() - 2
-    } else {
-        input.len() - 1
-    };
 
     let mut idx = 0;
 
-    while idx < input.len() && last_file_idx >= idx {
-        if idx % 2 == 0 {
-            let file_size = input[idx];
-
-            if file_size == 0 {
-                break;
-            }
-
-            optimal_ids.extend(vec![file_id; file_size as usize]);
-            input[idx] = 0;
-            idx += 1;
-            file_id += 1;
-        } else {
-            let free_size = input[idx];
-            if free_size == 0 {
+    // i have no idea what I am doing at this point, but it works
+    while idx < input.len() {
+        match input[idx] {
+            Block::File(file_size, file_id) => {
+                optimal_ids.extend(vec![file_id; file_size as usize]);
+                input[idx] = Block::File(0, file_id);
                 idx += 1;
-                continue;
             }
+            Block::Free(free_size) => {
+                if free_size == 0 {
+                    idx += 1;
+                    continue;
+                }
 
-            let last_file_size = input[last_file_idx];
-            if last_file_size == 0 {
-                last_file_idx -= 2;
-                continue;
+                match get_last_fitting_file_idx(free_size, &input) {
+                    Some(last_fitting_file_idx) => {
+                        let Block::File(file_size, file_id) = input[last_fitting_file_idx] else {
+                            panic!("get_last_fitting_file_idx returned a free block dafuq");
+                        };
+
+                        optimal_ids.extend(vec![file_id; file_size as usize]);
+
+                        input[idx] = Block::Free(free_size - file_size);
+
+                        input[last_fitting_file_idx] = Block::Free(file_size);
+                    }
+                    None => {
+                        optimal_ids.extend(vec![0; free_size as usize]);
+                        input[idx] = Block::Free(0);
+                    }
+                }
             }
-
-            let last_file_id = last_file_idx / 2;
-            optimal_ids.push(last_file_id);
-            input[last_file_idx] -= 1;
-            input[idx] -= 1;
         }
     }
 
@@ -64,12 +85,20 @@ fn main() -> Result<(), Error> {
         panic!("Input is not one line");
     }
 
-    let input = lines
+    let input: Vec<Block> = lines
         .first()
         .unwrap()
         .chars()
         .map(|c| c.to_digit(10).expect("valid digit"))
-        .collect::<Vec<u32>>();
+        .enumerate()
+        .map(|(idx, d)| {
+            if idx % 2 == 0 {
+                Block::File(d, idx / 2)
+            } else {
+                Block::Free(d)
+            }
+        })
+        .collect::<Vec<_>>();
 
     let optimal_disk_layout = get_optimal_disk_layout(input);
 
