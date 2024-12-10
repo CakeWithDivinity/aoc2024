@@ -1,27 +1,27 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     fs::File,
     io::{BufRead, BufReader, Error},
 };
 
 const DIRECTIONS: &[(isize, isize)] = &[(-1, 0), (1, 0), (0, -1), (0, 1)];
 
-fn get_reachable_end_positions(
+fn get_rating(
     map: &[Vec<u32>],
-    cache: &mut HashMap<(usize, usize), Vec<(usize, usize)>>,
+    cache: &mut HashMap<(usize, usize), usize>,
     position: (usize, usize),
-) -> Vec<(usize, usize)> {
-    if let Some(end_positions) = cache.get(&position) {
-        return end_positions.clone();
+) -> usize {
+    if let Some(rating) = cache.get(&position) {
+        return *rating;
     }
 
     let curr_height = map[position.0][position.1];
 
     if curr_height == 9 {
-        return vec![position];
+        return 1;
     }
 
-    let reachable_end_positions = DIRECTIONS
+    let rating: usize = DIRECTIONS
         .iter()
         .filter_map(|direction| {
             let new_pos = (
@@ -35,16 +35,13 @@ fn get_reachable_end_positions(
                 return None;
             }
 
-            Some(get_reachable_end_positions(map, cache, new_pos))
+            Some(get_rating(map, cache, new_pos))
         })
-        .flatten()
-        .collect::<HashSet<(usize, usize)>>();
+        .sum();
 
-    let unique_end_positions: Vec<(usize, usize)> = reachable_end_positions.into_iter().collect();
+    cache.insert(position, rating);
 
-    cache.insert(position, unique_end_positions.clone());
-
-    unique_end_positions
+    rating
 }
 
 fn main() -> Result<(), Error> {
@@ -61,7 +58,7 @@ fn main() -> Result<(), Error> {
         })
         .collect::<Vec<_>>();
 
-    let mut cache: HashMap<(usize, usize), Vec<(usize, usize)>> = HashMap::new();
+    let mut cache: HashMap<(usize, usize), usize> = HashMap::new();
 
     let score_sum = map
         .iter()
@@ -70,9 +67,7 @@ fn main() -> Result<(), Error> {
             line.iter()
                 .enumerate()
                 .filter(|(_, height)| **height == 0)
-                .map(|(col_idx, _)| {
-                    get_reachable_end_positions(&map, &mut cache, (line_idx, col_idx)).len()
-                })
+                .map(|(col_idx, _)| get_rating(&map, &mut cache, (line_idx, col_idx)))
                 .sum::<usize>()
         })
         .sum::<usize>();
