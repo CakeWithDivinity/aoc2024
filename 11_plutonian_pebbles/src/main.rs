@@ -21,20 +21,24 @@ fn split_if_even(num: usize) -> Option<(usize, usize)> {
     Some((*left, *right))
 }
 
-fn blink(stone: usize, cache: &mut HashMap<usize, Vec<usize>>) -> Vec<usize> {
-    if let Some(res) = cache.get(&stone) {
-        return res.clone();
+fn blink(stone: usize, blinks: usize, cache: &mut HashMap<(usize, usize), usize>) -> usize {
+    let Some(blinks) = blinks.checked_sub(1) else {
+        return 1;
+    };
+
+    if let Some(res) = cache.get(&(stone, blinks)) {
+        return *res;
     }
 
     let result = if stone == 0 {
-        vec![1]
+        blink(1, blinks, cache)
     } else if let Some((left, right)) = split_if_even(stone) {
-        vec![left, right]
+        blink(left, blinks, cache) + blink(right, blinks, cache)
     } else {
-        vec![stone * 2024]
+        blink(stone * 2024, blinks, cache)
     };
 
-    cache.insert(stone, result.clone());
+    cache.insert((stone, blinks), result);
 
     result
 }
@@ -48,23 +52,20 @@ fn main() -> Result<(), Error> {
         .map(|line| line.expect("valid line"))
         .collect::<Vec<_>>();
 
-    let mut stones = lines
+    let stones = lines
         .first()
         .expect("first line")
         .split(' ')
         .map(|stone| stone.parse::<usize>().expect("valid number"))
         .collect::<Vec<_>>();
 
-    let mut cache: HashMap<usize, Vec<usize>> = HashMap::new();
+    let mut cache: HashMap<(usize, usize), usize> = HashMap::new();
 
-    for _ in 0..25 {
-        stones = stones
-            .iter()
-            .flat_map(|stone| blink(*stone, &mut cache))
-            .collect();
-    }
+    let stone_count: usize = stones
+        .iter()
+        .map(|stone| blink(*stone, 75, &mut cache))
+        .sum();
 
-    let stone_count = stones.len();
     println!("Stone count: {stone_count}");
 
     Ok(())
