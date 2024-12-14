@@ -4,19 +4,21 @@ use std::{
     io::{BufRead, BufReader, Error},
 };
 
-fn parse_button_value(value: &str) -> usize {
+use num::Integer;
+
+fn parse_button_value(value: &str) -> isize {
     let (_, value) = value.split_once("+").expect("+ is present");
 
-    value.parse().expect("valid usize")
+    value.parse().expect("valid isize")
 }
 
-fn parse_target_value(value: &str) -> usize {
+fn parse_target_value(value: &str) -> isize {
     let (_, value) = value.split_once("=").expect("= is present");
 
-    value.parse().expect("valid usize")
+    value.parse().expect("valid isize")
 }
 
-fn parse_target(line: &str) -> (usize, usize) {
+fn parse_target(line: &str) -> (isize, isize) {
     let (_, rest) = line.split_once(": ").expect("colon present");
     let (x, y) = rest.split_once(", ").expect("comma present");
 
@@ -25,9 +27,9 @@ fn parse_target(line: &str) -> (usize, usize) {
 
 #[derive(Debug)]
 struct Button {
-    x: usize,
-    y: usize,
-    cost: usize,
+    x: isize,
+    y: isize,
+    cost: isize,
 }
 
 impl From<&String> for Button {
@@ -51,60 +53,61 @@ impl From<&String> for Button {
     }
 }
 
-fn get_max_button_presses(button: &Button, target: &(usize, usize)) -> usize {
-    let max_x_presses = target.0 / button.x;
-    let max_y_presses = target.1 / button.y;
-
-    max_x_presses.min(max_y_presses)
+fn get_determinant(a: isize, b: isize, c: isize, d: isize) -> isize {
+    a * d - b * c
 }
 
 #[derive(Debug)]
 struct Puzzle {
     button_a: Button,
     button_b: Button,
-    target: (usize, usize),
+    target: (isize, isize),
 }
 
 impl Puzzle {
-    fn get_min_cost(&self) -> Option<usize> {
-        // let gcd_x = self.button_a.x.gcd(&self.button_b.x);
-        // let gcd_y = self.button_a.y.gcd(&self.button_b.y);
+    fn get_min_cost(&self) -> Option<isize> {
+        let gcd_x = self.button_a.x.gcd(&self.button_b.x);
+        let gcd_y = self.button_a.y.gcd(&self.button_b.y);
 
-        // let has_x_solution = self.target.0 % gcd_x == 0;
-        // let has_y_solution = self.target.1 % gcd_y == 0;
+        let has_x_solution = self.target.0 % gcd_x == 0;
+        let has_y_solution = self.target.1 % gcd_y == 0;
 
-        // if !has_x_solution || !has_y_solution {
-        //     return None;
-        // }
-
-        let mut costs: Vec<usize> = Vec::new();
-
-        for a in 0..=100 {
-            let button_a_x = self.button_a.x * a;
-            let button_a_y = self.button_a.y * a;
-
-            if button_a_x > self.target.0 || button_a_y > self.target.1 {
-                break;
-            }
-
-            for b in 0..=100 {
-                let button_b_x = self.button_b.x * b;
-                let button_b_y = self.button_b.y * b;
-
-                let sum_x = button_a_x + button_b_x;
-                let sum_y = button_a_y + button_b_y;
-
-                if sum_x > self.target.0 || sum_y > self.target.1 {
-                    break;
-                }
-
-                if sum_x == self.target.0 && sum_y == self.target.1 {
-                    costs.push(a * self.button_a.cost + b * self.button_b.cost);
-                }
-            }
+        if !has_x_solution || !has_y_solution {
+            return None;
         }
 
-        costs.into_iter().min()
+        let count_a = get_determinant(
+            self.target.0,
+            self.target.1,
+            self.button_b.x,
+            self.button_b.y,
+        ) / get_determinant(
+            self.button_a.x,
+            self.button_a.y,
+            self.button_b.x,
+            self.button_b.y,
+        );
+
+        let count_b = get_determinant(
+            self.button_a.x,
+            self.button_a.y,
+            self.target.0,
+            self.target.1,
+        ) / get_determinant(
+            self.button_a.x,
+            self.button_a.y,
+            self.button_b.x,
+            self.button_b.y,
+        );
+
+        let x_result = self.button_a.x * count_a + self.button_b.x * count_b;
+        let y_result = self.button_a.y * count_a + self.button_b.y * count_b;
+
+        if x_result != self.target.0 || y_result != self.target.1 {
+            return None;
+        }
+
+        Some(count_a * self.button_a.cost + count_b * self.button_b.cost)
     }
 }
 
@@ -126,6 +129,8 @@ fn main() -> Result<(), Error> {
             let button_b: Button = lines.next().expect("button b").into();
             let target = parse_target(lines.next().expect("target"));
 
+            let target = (target.0 + 10000000000000, target.1 + 10000000000000);
+
             Puzzle {
                 button_a,
                 button_b,
@@ -134,7 +139,7 @@ fn main() -> Result<(), Error> {
         })
         .collect::<Vec<_>>();
 
-    let costs: usize = puzzles
+    let costs: isize = puzzles
         .iter()
         .map(|puzzle| puzzle.get_min_cost().unwrap_or(0))
         .sum();
