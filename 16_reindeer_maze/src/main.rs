@@ -1,11 +1,10 @@
-use core::panic;
 use std::{
-    collections::{BinaryHeap, HashMap},
+    collections::{BinaryHeap, HashMap, HashSet},
     fs::File,
     io::{BufRead, BufReader, Error},
 };
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 enum Direction {
     Up,
     Down,
@@ -42,11 +41,12 @@ impl Direction {
     }
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 struct Point {
     pos: (usize, usize),
     enter_direction: Direction,
     cost: usize,
+    previous_points: HashSet<(usize, usize)>,
 }
 
 impl Ord for Point {
@@ -86,44 +86,74 @@ fn find_coordinates(map: &[Vec<char>], target: char) -> Option<(usize, usize)> {
         .map(|(line_idx, col_idx, _)| (line_idx, col_idx))
 }
 
-fn insert_to_cost_if_cheaper(
+fn add_to_queue(
     map: &[Vec<char>],
-    costs: &mut HashMap<(usize, usize), usize>,
     queue: &mut BinaryHeap<Point>,
     point: &Point,
     direction: &Direction,
     cost_increase: usize,
 ) {
-    if let Some(pos_forwards) = walk_direction(point.pos, direction) {
-        if let Some('.' | 'E') = get_on_map(map, pos_forwards) {
+    if let Some(new_pos) = walk_direction(point.pos, direction) {
+        if let Some('.' | 'E') = get_on_map(map, new_pos) {
             let cost = point.cost + cost_increase;
 
-            if cost < *costs.get(&pos_forwards).unwrap_or(&usize::MAX) {
-                costs.insert(pos_forwards, cost);
-                queue.push(Point {
-                    pos: pos_forwards,
-                    cost,
-                    enter_direction: *direction,
-                });
+            if point.previous_points.contains(&new_pos) {
+                return;
             }
+
+            let mut path = point.previous_points.clone();
+            path.insert(point.pos);
+
+            queue.push(Point {
+                pos: new_pos,
+                cost,
+                enter_direction: *direction,
+                previous_points: path,
+            });
         }
     }
 }
 
-fn get_min_cost(map: &[Vec<char>], start_pos: (usize, usize), end_pos: (usize, usize)) -> usize {
-    let mut costs: HashMap<(usize, usize), usize> = HashMap::new();
+fn get_min_cost_tiles(
+    map: &[Vec<char>],
+    start_pos: (usize, usize),
+    end_pos: (usize, usize),
+) -> usize {
     let mut queue: BinaryHeap<Point> = BinaryHeap::new();
+    let mut visited_points: HashMap<(usize, usize, Direction), usize> = HashMap::new();
 
     queue.push(Point {
         pos: start_pos,
         enter_direction: Direction::Right,
         cost: 0,
+        previous_points: HashSet::new(),
     });
+
+    let mut paths_to_finish: Vec<(usize, HashSet<(usize, usize)>)> = Vec::new();
 
     while let Some(point) = queue.pop() {
         if point.pos == end_pos {
-            return point.cost;
+            let cost = point.cost;
+
+            let mut path = point.previous_points.clone();
+            path.insert(point.pos);
+
+            paths_to_finish.push((cost, path));
+            continue;
         }
+
+        if point.cost
+            > *visited_points
+                .get(&(point.pos.0, point.pos.1, point.enter_direction))
+                .unwrap_or(&usize::MAX)
+        {
+            continue;
+        }
+
+        visited_points.insert(
+            (point.pos.0, point.pos.1, point.enter_direction),
+            point.cost,
+        );
 
         [
             (point.enter_direction, 1),
@@ -132,18 +162,27 @@ fn get_min_cost(map: &[Vec<char>], start_pos: (usize, usize), end_pos: (usize, u
         ]
         .iter()
         .for_each(|(direction, cost_increase)| {
-            insert_to_cost_if_cheaper(
-                map,
-                &mut costs,
-                &mut queue,
-                &point,
-                direction,
-                *cost_increase,
-            )
+            add_to_queue(map, &mut queue, &point, direction, *cost_increase)
         });
     }
 
-    panic!("no path could be found")
+    let min_cost = paths_to_finish
+        .iter()
+        .map(|path| path.0)
+        .min()
+        .expect("at least one path");
+
+    let mut tiles_on_min_path: HashSet<(usize, usize)> = HashSet::new();
+
+    paths_to_finish
+        .iter()
+        .filter(|path| path.0 == min_cost)
+        .flat_map(|path| path.1.iter())
+        .for_each(|pos| {
+            tiles_on_min_path.insert(*pos);
+        });
+
+    tiles_on_min_path.len()
 }
 
 fn main() -> Result<(), Error> {
@@ -158,9 +197,9 @@ fn main() -> Result<(), Error> {
     let start_pos = find_coordinates(&map, 'S').expect("start is present");
     let end_pos = find_coordinates(&map, 'E').expect("end is present");
 
-    let min_cost = get_min_cost(&map, start_pos, end_pos);
+    let min_cost_tiles = get_min_cost_tiles(&map, start_pos, end_pos);
 
-    println!("Min cost is {min_cost}");
+    println!("Min cost tiles is {min_cost_tiles}");
 
     Ok(())
 }
